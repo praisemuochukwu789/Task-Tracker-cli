@@ -1,202 +1,125 @@
 import sys
-import json
-import os
-from datetime import datetime
+import storage
+import models
 
-FILENAME = "tasks.json" 
-# Top check: make sure they provided at least ONE action word
-if len(sys.argv) < 2:
-    print("Please provide a command. Example: python task-cli.py add \"Buy groceries\"")
-    sys.exit()
+def main():
+    if len(sys.argv) < 2:
+        print("Please provide a command. Example: python task-cli.py add \"Buy groceries\"")
+        return
 
-action = sys.argv[1]
+    command = sys.argv[1].lower()
 
-# Specific check: handle 'add' command inputs inside its own section
-if action.lower() == "add":
-    if len(sys.argv) != 3:
-        print("Error: Missing task description! Usage: python task-cli.py add \"Buy groceries\" (wrap task in quotes!) ")
-        sys.exit()
-    task_name = sys.argv[2]
-    # Load existing tasks from tasks.json if it exists
-    try:
-        with open(FILENAME, "r") as file:
-            tasks = json.load(file)
-    except (FileNotFoundError, json.JSONDecodeError):
-        tasks = []
+    if command == "add":
+        if len(sys.argv) != 3:
+            print("Error: Missing task description! Usage: python task-cli.py add \"Buy groceries\"")
+            return
+        
+        task_name = sys.argv[2]
+        tasks = storage.load_tasks()
 
-    # Calculate the next unique ID
-    if len(tasks) == 0:
-        new_id = 1
-    else:
-        new_id = max(task["id"] for task in tasks) + 1
+        new_id = 1 if len(tasks) == 0 else max(task["id"] for task in tasks) + 1
+        new_task = models.create_task_blueprint(new_id, task_name)
 
-    # Create and append the new task
-    now = datetime.now().isoformat()
-    new_task = {
-        "id": new_id,
-        "description": task_name,
-        "status": "todo",
-        "createdAt": now,
-        "updatedAt": now
-    }
+        tasks.append(new_task)
+        storage.save_tasks(tasks)
+        print(f"Task added successfully (ID: {new_id})")
 
-    tasks.append(new_task)
+    elif command == "list":
+        tasks = storage.load_tasks()
 
-    # Save the updated tasks list back to tasks.json
-    with open(FILENAME, "w") as file:
-        json.dump(tasks, file, indent=4)
+        if len(tasks) == 0:
+            print("No tasks found.")
+            return
 
-    print(f"Task added successfully (ID: {new_id})")
+        status_filter = sys.argv[2].lower() if len(sys.argv) > 2 else None
 
-# Specific check: handle 'add' command inputs inside its own section
-elif action.lower() == "list":
-    # Check if tasks file exists
-    try:
-        with open(FILENAME, "r") as file:
-            tasks = json.load(file)
-    except (FileNotFoundError, json.JSONDecodeError):
-        tasks = []
+        for task in tasks:
+            if status_filter is None or task["status"] == status_filter:
+                created_str = models.format_timestamp(task.get("createdAt", ""))
+                updated_str = models.format_timestamp(task.get("updatedAt", ""))
 
-    if len(tasks) == 0:
-        print("No tasks found.")
-        sys.exit()
+                print(f"[{task['id']}] {task['description']} ({task['status']})")
+                print(f"    Created: {created_str} | Updated: {updated_str}")
 
-    # Check for optional status filter
-    status_filter = sys.argv[2].lower() if len(sys.argv) > 2 else None
+    elif command in ["mark-in-progress", "mark-done"]:
+        if len(sys.argv) < 3:
+            print(f"Error: Missing task ID! Usage: python task-cli.py {command} <id>")
+            return
 
-    # Print all matching tasks
-    for task in tasks:
-        if status_filter is None or task["status"] == status_filter:
-            # Fallback values handle older tasks in tasks.json created before adding timestamps
-            try:
-                created_dt = datetime.fromisoformat(task.get("createdAt", ""))
-                created_str = created_dt.strftime("%d %b %Y, %H:%M")
-            except ValueError:
-                created_str = "N/A"
+        try:
+            target_id = int(sys.argv[2])
+        except ValueError:
+            print("Error: Task ID must be a valid number!")
+            return
 
-            # Safely format updatedAt
-            try:
-                updated_dt = datetime.fromisoformat(task.get("updatedAt", ""))
-                updated_str = updated_dt.strftime("%d %b %Y, %H:%M")
-            except ValueError:
-                updated_str = "N/A"
+        tasks = storage.load_tasks()
+        new_status = "in-progress" if command == "mark-in-progress" else "done"
+        task_found = False
 
-            print(f"[{task['id']}] {task['description']} ({task['status']})")
-            print(f"    Created: {created_str} | Updated: {updated_str}")
+        for task in tasks:
+            if task["id"] == target_id:
+                task["status"] = new_status
+                task["updatedAt"] = models.get_now_iso()
+                task_found = True
+                break
 
-# Handle 'mark-in-progress' and 'mark-done' commands
-elif action.lower() in ["mark-in-progress", "mark-done"]:
-    if len(sys.argv) < 3:
-        print(f"Error: Missing task ID! Usage: python task-cli.py {action.lower()} <id>")
-        sys.exit()
+        if not task_found:
+            print(f"Error: Task with ID {target_id} not found.")
+            return
 
-    try:
-        target_id = int(sys.argv[2])
-    except ValueError:
-        print("Error: Task ID must be a valid number!")
-        sys.exit()
+        storage.save_tasks(tasks)
+        print(f"Task {target_id} marked as {new_status} successfully!")
 
-    # Load existing tasks
-    try:
-        with open(FILENAME, "r") as file:
-            tasks = json.load(file)
-    except (FileNotFoundError, json.JSONDecodeError):
-        tasks = []
+    elif command == "update":
+        if len(sys.argv) < 4:
+            print('Error: Missing arguments! Usage: python task-cli.py update <id> "New description"')
+            return
 
-    # Map command directly to target status string
-    new_status = "in-progress" if action.lower() == "mark-in-progress" else "done"
-    task_found = False
+        try:
+            target_id = int(sys.argv[2])
+        except ValueError:
+            print("Error: Task ID must be a valid number!")
+            return
 
-    # Search and update status in place
-    for task in tasks:
-        if task["id"] == target_id:
-            task["status"] = new_status
-            task["updatedAt"] = datetime.now().isoformat()
-            task_found = True
-            break
+        new_description = sys.argv[3]
+        tasks = storage.load_tasks()
+        task_found = False
 
-    if not task_found:
-        print(f"Error: Task with ID {target_id} not found.")
-        sys.exit()
+        for task in tasks:
+            if task["id"] == target_id:
+                task["description"] = new_description
+                task["updatedAt"] = models.get_now_iso()
+                task_found = True
+                break
 
-    # Save changes back to tasks.json
-    with open(FILENAME, "w") as file:
-        json.dump(tasks, file, indent=4)
+        if not task_found:
+            print(f"Error: Task with ID {target_id} not found.")
+            return
 
-    print(f"Task {target_id} marked as {new_status} successfully!")
+        storage.save_tasks(tasks)
+        print(f"Task {target_id} updated successfully!")
 
+    elif command == "delete":
+        if len(sys.argv) < 3:
+            print("Error: Missing task ID! Usage: python task-cli.py delete <id>")
+            return
 
-elif action.lower() == "update":
-    # Validate argument counts
-    if len(sys.argv) < 4:
-        print('Error: Missing arguments! Usage: python task-cli.py update <id> "New description"')
-        sys.exit()
+        try:
+            target_id = int(sys.argv[2])
+        except ValueError:
+            print("Error: Task ID must be a valid number!")
+            return
 
-    # Parse and validate integer ID
-    try:
-        target_id = int(sys.argv[2])
-    except ValueError:
-        print("Error: Task ID must be a valid number!")
-        sys.exit()
+        tasks = storage.load_tasks()
+        initial_count = len(tasks)
+        tasks = [task for task in tasks if task["id"] != target_id]
 
-    new_description = sys.argv[3]
+        if len(tasks) == initial_count:
+            print(f"Error: Task with ID {target_id} not found.")
+            return
 
-    # Load existing tasks safely
-    try:
-        with open(FILENAME, "r") as file:
-            tasks = json.load(file)
-    except (FileNotFoundError, json.JSONDecodeError):
-        tasks = []
+        storage.save_tasks(tasks)
+        print(f"Task {target_id} deleted successfully!")
 
-    # Find task and modify description in memory
-    task_found = False
-    for task in tasks:
-        if task["id"] == target_id:
-            task["description"] = new_description
-            task["updatedAt"] = datetime.now().isoformat()
-            task_found = True
-            break
-
-    if not task_found:
-        print(f"Error: Task with ID {target_id} not found.")
-        sys.exit()
-
-    # Persist changes back to disk
-    with open(FILENAME, "w") as file:
-        json.dump(tasks, file, indent=4)
-
-    print(f"Task {target_id} updated successfully!")
-
-elif action.lower() == "delete":
-    # Validate argument count
-    if len(sys.argv) < 3:
-        print("Error: Missing task ID! Usage: python task-cli.py delete <id>")
-        sys.exit()
-
-    # Parse ID safely
-    try:
-        target_id = int(sys.argv[2])
-    except ValueError:
-        print("Error: Task ID must be a valid number!")
-        sys.exit()
-
-    # Load existing tasks
-    try:
-        with open(FILENAME, "r") as file:
-            tasks = json.load(file)
-    except (FileNotFoundError, json.JSONDecodeError):
-        tasks = []
-
-    # Check if the task exists before deleting
-    initial_count = len(tasks)
-    tasks = [task for task in tasks if task["id"] != target_id]
-
-    if len(tasks) == initial_count:
-        print(f"Error: Task with ID {target_id} not found.")
-        sys.exit()
-
-    # Save remaining tasks back to disk
-    with open(FILENAME, "w") as file:
-        json.dump(tasks, file, indent=4)
-
-    print(f"Task {target_id} deleted successfully!")
+if __name__ == "__main__":
+    main()
