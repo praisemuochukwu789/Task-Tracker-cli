@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: task-tracker-cli
+Version: 0.1.0
+Summary: A lightweight command-line task management application
+Author: Praise
+License: MIT
+Classifier: Programming Language :: Python :: 3
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown

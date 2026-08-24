@@ -1,0 +1,8 @@
+# Python build & metadata artifacts
+*.egg-info/
+__pycache__/
+build/
+dist/
+
+# Local data file
+tasks.json

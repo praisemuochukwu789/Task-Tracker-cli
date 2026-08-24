@@ -9,6 +9,9 @@ def create_task_blueprint(new_id,  task_name):
         "createdAt": now,
         "updatedAt": now
     }
+def get_now_iso():
+    """Returns the current timestamp formatted in ISO 8601 string format."""
+    return datetime.now().isoformat()
 
 def format_timestamp(iso_str):
     """Converts ISO string to readable format or N/A."""

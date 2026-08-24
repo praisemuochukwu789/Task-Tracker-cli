@@ -33,13 +33,23 @@ def main():
 
         status_filter = sys.argv[2].lower() if len(sys.argv) > 2 else None
 
+        # 1. Collect only the tasks that match the filter
+        matching_tasks = []
         for task in tasks:
             if status_filter is None or task["status"] == status_filter:
-                created_str = models.format_timestamp(task.get("createdAt", ""))
-                updated_str = models.format_timestamp(task.get("updatedAt", ""))
+                matching_tasks.append(task)
 
-                print(f"[{task['id']}] {task['description']} ({task['status']})")
-                print(f"    Created: {created_str} | Updated: {updated_str}")
+            # 2. Check if we found anything
+            if not matching_tasks:
+                print("No tasks found.")
+            else:
+                # 3. Print the matching tasks
+                for task in matching_tasks:
+                    created_str = models.format_timestamp(task.get("createdAt", ""))
+                    updated_str = models.format_timestamp(task.get("updatedAt", ""))
+
+                    print(f"[{task['id']}] {task['description']} ({task['status']})")
+                    print(f"    Created: {created_str} | Updated: {updated_str}")
 
     elif command in ["mark-in-progress", "mark-done"]:
         if len(sys.argv) < 3:
