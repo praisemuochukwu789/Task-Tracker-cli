@@ -45,7 +45,7 @@ Task-Tracker/
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/your-username/task-tracker-cli.git
+   git clone https://github.com/praisemuochukwu789/task-tracker-cli.git
    cd task-tracker-cli
    ```
 
@@ -135,6 +135,16 @@ Task 1 deleted successfully!
 ```
 
 ---
+
+### 6. Dropping Tasks in Bulk
+Remove all tasks, or bulk delete tasks by status (`all`, `todo`, `in-progress`, or `done`).
+
+```bash
+# Delete all tasks matching a specific status
+task drop done
+
+# Delete all tasks entirely
+task drop all
 
 ## Data Schema & Storage
 

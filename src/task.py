@@ -30,26 +30,17 @@ def main():
         if len(tasks) == 0:
             print("No tasks found.")
             return
-
+        
         status_filter = sys.argv[2].lower() if len(sys.argv) > 2 else None
-
-        # 1. Collect only the tasks that match the filter
-        matching_tasks = []
         for task in tasks:
             if status_filter is None or task["status"] == status_filter:
-                matching_tasks.append(task)
 
-            # 2. Check if we found anything
-            if not matching_tasks:
-                print("No tasks found.")
-            else:
-                # 3. Print the matching tasks
-                for task in matching_tasks:
-                    created_str = models.format_timestamp(task.get("createdAt", ""))
-                    updated_str = models.format_timestamp(task.get("updatedAt", ""))
+                created_str = models.format_timestamp(task.get("createdAt", ""))
+                updated_str = models.format_timestamp(task.get("updatedAt", ""))
 
-                    print(f"[{task['id']}] {task['description']} ({task['status']})")
-                    print(f"    Created: {created_str} | Updated: {updated_str}")
+                print(f"[{task['id']}] {task['description']} ({task['status']})")
+                print(f"    Created: {created_str} | Updated: {updated_str}") 
+
 
     elif command in ["mark-in-progress", "mark-done"]:
         if len(sys.argv) < 3:
@@ -105,7 +96,7 @@ def main():
         if not task_found:
             print(f"Error: Task with ID {target_id} not found.")
             return
-
+        
         storage.save_tasks(tasks)
         print(f"Task {target_id} updated successfully!")
 
@@ -113,13 +104,13 @@ def main():
         if len(sys.argv) < 3:
             print("Error: Missing task ID! Usage: python task-cli.py delete <id>")
             return
-
+        
         try:
             target_id = int(sys.argv[2])
         except ValueError:
             print("Error: Task ID must be a valid number!")
             return
-
+        
         tasks = storage.load_tasks()
         initial_count = len(tasks)
         tasks = [task for task in tasks if task["id"] != target_id]
@@ -127,9 +118,32 @@ def main():
         if len(tasks) == initial_count:
             print(f"Error: Task with ID {target_id} not found.")
             return
-
+        
         storage.save_tasks(tasks)
         print(f"Task {target_id} deleted successfully!")
+
+    elif command == "drop":
+        if len(sys.argv) != 3:
+            print(f"Error: Missing argument. Usage: task drop <all|todo|in-progress|done>")
+            return
+        
+        status_filter = sys.argv[2].lower()
+        tasks = storage.load_tasks()
+
+        if status_filter == "all":
+            tasks = []
+            print("All tasks deleted successfully!")
+        elif status_filter in ("todo", "done", "in-progress"):
+            # Keep only tasks that do NOT match the status to drop
+            original_count = len(tasks)
+            tasks = [task for task in tasks if task["status"] != status_filter]
+            deleted_count = original_count - len(tasks)
+            print(f"Deleted {deleted_count} task(s) with status '{status_filter}'.")
+        else:
+            print(f"Error: Invalid status filter '{status_filter}'. Choose from: all, todo, in-progress, done.")
+            return
+
+        storage.save_tasks(tasks)
 
 if __name__ == "__main__":
     main()
